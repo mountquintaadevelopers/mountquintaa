@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Secrets - never commit these (each folder has its own .env)
+.env
+.env.*
+!.env.example
+
+# Website data (enquiries, blogs) and uploaded images
+website/data/*.db
+website/data/*.db-*
+website/public/uploads/*
+!website/public/uploads/.gitkeep
+
+# API generated files (QR codes, uploads)
+api/src/uploads/
+
+# Local-only files
+backups/
+mariadb.log
+*.log
+
+# Old copies left at the root before the api/ + website/ split
+/src/

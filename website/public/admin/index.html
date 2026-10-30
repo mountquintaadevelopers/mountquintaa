@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — Mount Quintaa Leads</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" href="../assets/submark.png" />
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600&f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --olive:#426001;--olive-dark:#2B3F02;--terracotta:#B07A62;--gold:#F0E383;
+  --stone:#DFDFD5;--ink:#1E2410;--ivory:#F4F4EC;--muted:#5C5F52;
+  --heading:'Clash Display',sans-serif;--body:'General Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);background:var(--stone);color:var(--ink);min-height:100vh}
+.hidden{display:none!important}
+
+/* ---- Login ---- */
+.login-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--olive-dark)}
+.login-card{background:var(--ivory);border-radius:20px;padding:44px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.login-card img{height:56px;margin:0 auto 24px;display:block}
+.login-card h1{font-family:var(--heading);font-weight:600;font-size:24px;text-align:center;margin-bottom:28px}
+label{display:block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+input,select{width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid rgba(30,36,16,.18);font-family:var(--body);font-size:15px;background:#fff}
+input:focus,select:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(66,96,1,.14)}
+.btn{display:inline-flex;align-items:center;gap:8px;justify-content:center;padding:13px 26px;border-radius:999px;border:0;cursor:pointer;font-family:var(--body);font-size:15px;font-weight:500;transition:.25s}
+.btn-olive{background:var(--olive);color:#fff;width:100%;margin-top:24px}
+.btn-olive:hover{background:var(--olive-dark)}
+.btn-gold{background:var(--gold);color:var(--ink)}
+.btn-gold:hover{box-shadow:0 8px 24px rgba(240,227,131,.5)}
+.btn-outline{background:transparent;border:1.5px solid var(--terracotta);color:var(--terracotta)}
+.btn-outline:hover{background:var(--terracotta);color:#fff}
+.err-msg{color:#a03e2d;font-size:14px;font-weight:600;margin-top:14px;min-height:20px;text-align:center}
+
+/* ---- Dashboard ---- */
+.topbar{background:var(--olive-dark);color:var(--ivory);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.topbar img{height:40px}
+.topbar .title{font-family:var(--heading);font-weight:500;font-size:18px}
+.dash{max-width:1280px;margin:0 auto;padding:32px 24px}
+@media(max-width:640px){
+.dash{padding:20px 14px}.topbar{padding:12px 16px}.topbar img{height:32px}
+.stat-card{padding:16px 18px}.stat-card .num{font-size:26px}
+.controls{padding:16px}.controls .field{min-width:120px}
+.blog-editor,.blog-list{padding:20px 16px}
+.list-head{flex-direction:column;align-items:stretch}
+.list-head input{max-width:none;width:100%}
+.editor-actions{flex-wrap:wrap}
+.editor-actions .btn{flex:1;min-width:120px}
+.post-row{flex-direction:column;gap:8px}
+.post-row .p-actions{align-self:flex-start}
+.tabbar{overflow-x:auto;padding-bottom:4px}
+.cover-row{gap:10px}
+}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:#fff;border-radius:16px;padding:22px 26px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
+.stat-card .num{font-family:var(--heading);font-weight:600;font-size:34px;color:var(--olive)}
+.stat-card .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;background:#fff;border-radius:16px;padding:20px 24px;margin-bottom:24px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
+.controls .field{min-width:150px;flex:1}
+.controls label{margin-top:0}
+.controls .actions{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+.table-wrap{background:#fff;border-radius:16px;overflow:auto;box-shadow:0 8px 30px rgba(30,36,16,.08)}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{background:var(--olive);color:#fff;font-family:var(--heading);font-weight:500;font-size:14px;text-align:left;padding:14px 18px;white-space:nowrap;position:sticky;top:0}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:var(--olive-dark)}
+td{padding:14px 18px;font-size:14px;border-bottom:1px solid rgba(30,36,16,.08);vertical-align:top}
+tr:hover td{background:var(--ivory)}
+.msg-cell{max-width:280px;color:var(--muted)}
+.src-tag{display:inline-block;background:rgba(176,122,98,.12);color:var(--terracotta);font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;white-space:nowrap}
+.del-btn{background:none;border:0;cursor:pointer;color:#a03e2d;font-size:13px;font-weight:600}
+.del-btn:hover{text-decoration:underline}
+.empty-state{padding:60px;text-align:center;color:var(--muted)}
+/* ---- Tabs ---- */
+.tabbar{display:flex;gap:10px;margin-bottom:24px}
+.tab{font-family:var(--heading);font-weight:500;font-size:16px;padding:11px 28px;border-radius:999px;border:1.5px solid var(--olive);background:transparent;color:var(--olive);cursor:pointer;transition:.25s}
+.tab.active{background:var(--olive);color:#fff}
+/* ---- Blog editor ---- */
+.blog-layout{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:start}
+.blog-editor,.blog-list{background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
+.panel-title{font-family:var(--heading);font-weight:600;font-size:20px;margin-bottom:18px}
+.blog-editor textarea{width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid rgba(30,36,16,.18);font-family:var(--body);font-size:15px;resize:vertical}
+.blog-editor textarea:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(66,96,1,.14)}
+.editor-actions{display:flex;gap:12px;margin-top:20px}
+.post-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 0;border-bottom:1px solid rgba(30,36,16,.08)}
+.post-row:last-child{border-bottom:0}
+.post-row .p-title{font-weight:600;font-size:15px}
+.post-row .p-date{font-size:12px;color:var(--muted);margin-top:3px}
+.post-row .p-actions{display:flex;gap:14px;flex-shrink:0}
+.post-row button{background:none;border:0;cursor:pointer;font-size:13px;font-weight:600}
+.post-row .edit{color:var(--olive)}
+.post-row .del{color:#a03e2d}
+.post-row a.view{font-size:13px;font-weight:600;color:var(--terracotta);text-decoration:none}
+@media(max-width:900px){.blog-layout{grid-template-columns:1fr}}
+/* ---- Cover upload ---- */
+.cover-row{display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap}
+.upload-btn{padding:10px 20px;font-size:14px;cursor:pointer;user-select:none}
+.upload-note{font-size:13px;color:var(--muted)}
+.cover-preview{max-height:140px;border-radius:12px;margin-top:10px;box-shadow:0 4px 16px rgba(30,36,16,.15)}
+.content-meta{font-size:12px;color:var(--muted);margin-top:6px;text-align:right}
+.live-preview{margin-top:24px;border:1.5px dashed rgba(66,96,1,.4);border-radius:12px;padding:22px;background:var(--ivory)}
+.lp-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.lp-title{font-family:var(--heading);font-weight:600;font-size:24px;line-height:1.2;margin-bottom:6px}
+.lp-excerpt{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:12px}
+.lp-cover{max-height:180px;width:100%;object-fit:cover;border-radius:10px;margin:10px 0}
+.lp-body p{font-size:14.5px;line-height:1.7;margin-bottom:12px}
+.list-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.list-head input{max-width:220px;padding:10px 14px}
+.filter-chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.chip{font-family:var(--body);font-size:12.5px;font-weight:600;padding:6px 16px;border-radius:999px;border:1.5px solid rgba(66,96,1,.35);background:transparent;color:var(--olive);cursor:pointer;transition:.2s}
+.chip.active{background:var(--olive);color:#fff;border-color:var(--olive)}
+.status-badge{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:999px;margin-left:8px;vertical-align:middle}
+.status-badge.published{background:rgba(66,96,1,.12);color:var(--olive)}
+.status-badge.draft{background:rgba(176,122,98,.15);color:var(--terracotta)}
+.post-row .dup{color:#7a6b00}
+@media(max-width:640px){.controls .actions{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="login-screen" id="loginScreen">
+  <form class="login-card" id="loginForm">
+    <img src="../assets/logo-dark.png" alt="Mount Quintaa" />
+    <h1>Admin Panel</h1>
+    <label for="lg-user">Username</label>
+    <input id="lg-user" name="username" autocomplete="username" required />
+    <label for="lg-pass">Password</label>
+    <input id="lg-pass" name="password" type="password" autocomplete="current-password" required />
+    <button class="btn btn-olive" type="submit">Sign In</button>
+    <div class="err-msg" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashboard" class="hidden">
+  <div class="topbar">
+    <img src="../assets/logo-white.png" alt="Mount Quintaa" />
+    <span class="title">Lead Enquiries</span>
+    <button class="btn btn-outline" id="logoutBtn" style="border-color:var(--gold);color:var(--gold)">Sign Out</button>
+  </div>
+
+  <div class="dash">
+    <div class="tabbar">
+      <button class="tab active" data-tab="leads">Leads</button>
+      <button class="tab" data-tab="blogs">Blogs</button>
+    </div>
+
+    <!-- ============ LEADS TAB ============ -->
+    <div id="tab-leads">
+    <div class="stats-row">
+      <div class="stat-card"><div class="num" id="statTotal">–</div><div class="lbl">Total Leads</div></div>
+      <div class="stat-card"><div class="num" id="statToday">–</div><div class="lbl">Today</div></div>
+      <div class="stat-card"><div class="num" id="statWeek">–</div><div class="lbl">Last 7 Days</div></div>
+      <div class="stat-card"><div class="num" id="statMonth">–</div><div class="lbl">Last 30 Days</div></div>
+    </div>
+
+    <div class="controls">
+      <div class="field">
+        <label for="sortSel">Sort by date</label>
+        <select id="sortSel">
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
+      </div>
+      <div class="field"><label for="fromDate">From</label><input type="date" id="fromDate" /></div>
+      <div class="field"><label for="toDate">To</label><input type="date" id="toDate" /></div>
+      <div class="actions">
+        <button class="btn btn-outline" id="clearBtn" type="button">Clear Filters</button>
+        <button class="btn btn-olive" id="refreshBtn" type="button" style="width:auto;margin:0">Refresh</button>
+        <button class="btn btn-gold" id="excelBtn" type="button">⬇ Download Excel (.xlsx)</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Name</th><th>Phone</th><th>Email</th>
+            <th>Message</th><th>Source</th>
+            <th class="sortable" id="dateHeader">Date ⇅</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="leadRows"></tbody>
+      </table>
+      <div class="empty-state hidden" id="emptyState">No leads match these filters yet.</div>
+    </div>
+    </div><!-- /tab-leads -->
+
+    <!-- ============ BLOGS TAB ============ -->
+    <div id="tab-blogs" class="hidden">
+      <div class="stats-row">
+        <div class="stat-card"><div class="num" id="bStatTotal">–</div><div class="lbl">Total Posts</div></div>
+        <div class="stat-card"><div class="num" id="bStatPub">–</div><div class="lbl">Published</div></div>
+        <div class="stat-card"><div class="num" id="bStatDraft">–</div><div class="lbl">Drafts</div></div>
+        <div class="stat-card"><div class="num" id="bStatLast">–</div><div class="lbl">Last Published</div></div>
+      </div>
+
+      <div class="blog-layout">
+        <div class="blog-editor">
+          <h2 class="panel-title" id="editorTitle">Write a New Post</h2>
+          <form id="blogForm">
+            <input type="hidden" id="b-id" />
+            <label for="b-title">Title</label>
+            <input id="b-title" maxlength="160" placeholder="e.g. Managed Farmland 101: What You Actually Own" required />
+            <label for="b-cover">Cover image</label>
+            <div class="cover-row">
+              <label class="btn btn-outline upload-btn" for="b-file">📁 Upload Image</label>
+              <input type="file" id="b-file" accept="image/png,image/jpeg,image/webp" hidden />
+              <span class="upload-note" id="uploadNote">or paste a URL below</span>
+            </div>
+            <input id="b-cover" maxlength="500" placeholder="https://… (fills automatically after upload)" />
+            <img id="coverPreview" class="cover-preview hidden" alt="Cover preview" />
+            <label for="b-excerpt">Excerpt (short teaser, optional)</label>
+            <input id="b-excerpt" maxlength="300" placeholder="One or two lines shown on the Blogs page" />
+            <label for="b-content">Content</label>
+            <textarea id="b-content" rows="14" placeholder="Write your post here. Leave one empty line between paragraphs."></textarea>
+            <div class="content-meta"><span id="wordCount">0 words · 0 min read</span></div>
+            <label for="b-status">Status</label>
+            <select id="b-status">
+              <option value="published">Published — visible on the website</option>
+              <option value="draft">Draft — only visible here</option>
+            </select>
+            <div class="editor-actions">
+              <button class="btn btn-olive" type="submit" id="saveBlogBtn" style="width:auto;margin:0">Publish Post</button>
+              <button class="btn btn-outline" type="button" id="previewBtn">Preview</button>
+              <button class="btn btn-outline hidden" type="button" id="cancelEditBtn">Cancel Edit</button>
+            </div>
+            <div class="err-msg" id="blogErr" style="text-align:left"></div>
+          </form>
+          <div id="livePreview" class="live-preview hidden">
+            <div class="lp-label">Preview — how it will look on the site</div>
+            <div id="lpInner"></div>
+          </div>
+        </div>
+
+        <div class="blog-list">
+          <div class="list-head">
+            <h2 class="panel-title" style="margin:0">Posts</h2>
+            <input type="search" id="blogSearch" placeholder="Search posts…" />
+          </div>
+          <div class="filter-chips">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="published">Published</button>
+            <button class="chip" data-filter="draft">Drafts</button>
+          </div>
+          <div id="blogList"></div>
+          <div class="empty-state hidden" id="blogEmpty">Nothing here yet — write your first post!</div>
+        </div>
+      </div>
+    </div><!-- /tab-blogs -->
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
