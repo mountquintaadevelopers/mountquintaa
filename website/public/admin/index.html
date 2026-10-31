@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin — Mount Quintaa Leads</title>
 <meta name="robots" content="noindex, nofollow" />
-<link rel="icon" href="../assets/submark.png" />
+<link rel="icon" href="/assets/submark.png" />
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600&f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
 <style>
 :root{
@@ -122,8 +122,8 @@ tr:hover td{background:var(--ivory)}
 
 <!-- ================= LOGIN ================= -->
 <div class="login-screen" id="loginScreen">
-  <form class="login-card" id="loginForm">
-    <img src="../assets/logo-dark.png" alt="Mount Quintaa" />
+  <form class="login-card" id="loginForm" method="post" action="/admin">
+    <img src="/assets/logo-dark.png" alt="Mount Quintaa" />
     <h1>Admin Panel</h1>
     <label for="lg-user">Username</label>
     <input id="lg-user" name="username" autocomplete="username" required />
@@ -137,7 +137,7 @@ tr:hover td{background:var(--ivory)}
 <!-- ================= DASHBOARD ================= -->
 <div id="dashboard" class="hidden">
   <div class="topbar">
-    <img src="../assets/logo-white.png" alt="Mount Quintaa" />
+    <img src="/assets/logo-white.png" alt="Mount Quintaa" />
     <span class="title">Lead Enquiries</span>
     <button class="btn btn-outline" id="logoutBtn" style="border-color:var(--gold);color:var(--gold)">Sign Out</button>
   </div>
@@ -255,6 +255,6 @@ tr:hover td{background:var(--ivory)}
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script src="admin.js"></script>
+<script src="/admin/admin.js"></script>
 </body>
 </html>
