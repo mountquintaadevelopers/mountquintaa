@@ -243,6 +243,10 @@ body.inner .nav-toggle span{background:var(--color-ink)}
 .highlights li{display:flex;gap:12px;align-items:flex-start;font-size:16px;color:var(--color-ivory)}
 .highlights li::before{content:"✓";color:var(--color-gold);font-weight:700;flex-shrink:0}
 @media(max-width:640px){.highlights{grid-template-columns:1fr}}
+.offer-box{
+  max-width:640px;margin:-12px 0 32px;padding:16px 22px;font-size:16px;color:#fff;
+  border-left:3px solid var(--color-gold);background:rgba(240,227,131,.12);border-radius:8px;
+}
 
 /* ---------- Pillars ---------- */
 .ivory{background:var(--color-ivory)}
@@ -611,6 +615,7 @@ input,select,textarea{font-size:16px}  /* stops iOS zoom-on-focus */
   display:grid;place-items:center;margin:0 auto 14px;color:var(--color-olive);
 }
 .amenity .ic svg{width:28px;height:28px}
+.amenity p{margin-top:8px;font-size:14px;font-weight:400;line-height:1.5;color:var(--color-muted)}
 
 /* Contact page */
 .contact-layout{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
