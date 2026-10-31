@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npm --prefix website run dev",
     "start": "npm --prefix website start",
-    "setup": "npm install --prefix website"
+    "setup": "npm install --prefix website",
+    "make-password": "npm --prefix website run make-password"
   }
 }
