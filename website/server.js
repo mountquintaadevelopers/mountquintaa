@@ -1,6 +1,6 @@
 /* ============================================================
    MOUNT QUINTAA — Backend API
-   Node.js 22.13+ / 24 · Express 4 · built-in node:sqlite · JWT admin auth
+   Node.js 22+ · Express 4 · Supabase (Postgres + Storage) · JWT admin auth
    ------------------------------------------------------------
    Endpoints
      POST /api/leads          public   — save a form submission
@@ -8,6 +8,7 @@
      GET  /api/admin/leads    private  — list leads (sort/filter)
      GET  /api/admin/leads.csv private — CSV download (Excel)
      DELETE /api/admin/leads/:id private — delete a lead
+   Runs locally with `npm run dev`, and on Vercel through api/index.js.
    ============================================================ */
 "use strict";
 
@@ -20,10 +21,10 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { DatabaseSync } = require("node:sqlite"); // built into Node — no compiler needed
+const { createClient } = require("@supabase/supabase-js");
 
 /* ---------- Fail fast if critical env vars are missing ---------- */
-const REQUIRED_ENV = ["JWT_SECRET", "ADMIN_USER", "ADMIN_PASSWORD_HASH"];
+const REQUIRED_ENV = ["JWT_SECRET", "ADMIN_USER", "ADMIN_PASSWORD_HASH", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error("FATAL: missing environment variables: " + missing.join(", "));
@@ -39,37 +40,21 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === "production";
 
-/* ---------- Database (file-based SQLite, prepared statements only) ---------- */
-const fs = require("fs");
-fs.mkdirSync(path.join(__dirname, "data"), { recursive: true });
-const db = new DatabaseSync(path.join(__dirname, "data", "leads.db"));
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS leads (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT NOT NULL,
-    email      TEXT DEFAULT '',
-    phone      TEXT NOT NULL,
-    message    TEXT DEFAULT '',
-    source     TEXT DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at);
-  CREATE TABLE IF NOT EXISTS blogs (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    title      TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    excerpt    TEXT DEFAULT '',
-    content    TEXT NOT NULL,
-    cover_url  TEXT DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_blogs_created ON blogs(created_at);
-`);
-/* Migration: add draft/published status to blogs created by older versions */
-try { db.exec("ALTER TABLE blogs ADD COLUMN status TEXT NOT NULL DEFAULT 'published'"); }
-catch { /* column already exists */ }
+/* ---------- Database (Supabase) ----------
+   The service-role key is used only here on the server; it never reaches the browser.
+   Tables: leads, blogs (see supabase/schema.sql). Images: public Storage bucket. */
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
+const LEADS = process.env.SUPABASE_LEADS_TABLE || "leads";
+const BLOGS = process.env.SUPABASE_BLOGS_TABLE || "blogs";
+const BUCKET = process.env.SUPABASE_BUCKET || "blog-images";
+
+/* Throw on a Supabase error so every route reports it the same way */
+function check({ data, error, count }) {
+  if (error) throw new Error(`Supabase: ${error.message}`);
+  return { data, count };
+}
 
 /* ---------- Security middleware ---------- */
 app.set("trust proxy", 1);
@@ -92,10 +77,10 @@ app.use(
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGIN ? process.env.ALLOWED_ORIGIN.split(",") : true,
-    methods: ["GET", "POST", "DELETE"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
   })
 );
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "64kb" }));
 
 /* Rate limits: lead form 5/min per IP; login 5/min per IP */
 const leadLimiter = rateLimit({ windowMs: 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
@@ -104,6 +89,9 @@ const loginLimiter = rateLimit({ windowMs: 60_000, max: 5, standardHeaders: true
 /* ---------- Helpers ---------- */
 const clean = (v, max) => String(v ?? "").trim().slice(0, max);
 const errorId = () => crypto.randomBytes(4).toString("hex");
+
+/* Wrap async routes so errors reach the error handler with a reference ID */
+const safe = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 function requireAuth(req, res, next) {
   const auth = req.headers.authorization || "";
@@ -120,33 +108,25 @@ function requireAuth(req, res, next) {
 /* ============================================================
    PUBLIC: save a lead
    ============================================================ */
-app.post("/api/leads", leadLimiter, (req, res) => {
-  try {
-    const name = clean(req.body.name, 100);
-    const email = clean(req.body.email, 150);
-    const phone = clean(req.body.phone, 20);
-    const message = clean(req.body.message, 1000);
-    const source = clean(req.body.source, 100);
+app.post("/api/leads", leadLimiter, safe(async (req, res) => {
+  const name = clean(req.body.name, 100);
+  const email = clean(req.body.email, 150);
+  const phone = clean(req.body.phone, 20);
+  const message = clean(req.body.message, 1000);
+  const source = clean(req.body.source, 100);
 
-    if (name.length < 2) return res.status(400).json({ error: "Please enter your name." });
-    if (!/^[+\d][\d\s\-()]{6,19}$/.test(phone))
-      return res.status(400).json({ error: "Please enter a valid phone number." });
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return res.status(400).json({ error: "Please enter a valid email address." });
+  if (name.length < 2) return res.status(400).json({ error: "Please enter your name." });
+  if (!/^[+\d][\d\s\-()]{6,19}$/.test(phone))
+    return res.status(400).json({ error: "Please enter a valid phone number." });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: "Please enter a valid email address." });
 
-    db.prepare(
-      "INSERT INTO leads (name, email, phone, message, source) VALUES (?, ?, ?, ?, ?)"
-    ).run(name, email, phone, message, source);
+  check(await supabase.from(LEADS).insert({ name, email, phone, message, source }));
 
-    // PII is never logged — only a count.
-    console.log(`[lead] new enquiry saved (total: ${db.prepare("SELECT COUNT(*) c FROM leads").get().c})`);
-    res.status(201).json({ ok: true });
-  } catch (err) {
-    const id = errorId();
-    console.error(`[${id}]`, err.message);
-    res.status(500).json({ error: "Something went wrong. Please try again. (ref " + id + ")" });
-  }
-});
+  // PII is never logged.
+  console.log("[lead] new enquiry saved");
+  res.status(201).json({ ok: true });
+}));
 
 /* ============================================================
    ADMIN: login → JWT (8-hour expiry)
@@ -165,60 +145,67 @@ app.post("/api/admin/login", loginLimiter, async (req, res) => {
 /* ============================================================
    ADMIN: list leads  ?sort=asc|desc &from=YYYY-MM-DD &to=YYYY-MM-DD
    ============================================================ */
-app.get("/api/admin/leads", requireAuth, (req, res) => {
-  const sort = req.query.sort === "asc" ? "ASC" : "DESC";
+const LEAD_COLUMNS = "id, name, email, phone, message, source, created_at";
+
+app.get("/api/admin/leads", requireAuth, safe(async (req, res) => {
+  const ascending = req.query.sort === "asc";
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || "") ? req.query.from : null;
   const to = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to || "") ? req.query.to : null;
 
-  let sql = "SELECT id, name, email, phone, message, source, created_at FROM leads";
-  const where = [], params = [];
-  if (from) { where.push("date(created_at) >= date(?)"); params.push(from); }
-  if (to)   { where.push("date(created_at) <= date(?)"); params.push(to); }
-  if (where.length) sql += " WHERE " + where.join(" AND ");
-  sql += ` ORDER BY created_at ${sort}`;
+  let query = supabase.from(LEADS).select(LEAD_COLUMNS);
+  if (from) query = query.gte("created_at", `${from}T00:00:00Z`);
+  if (to) query = query.lte("created_at", `${to}T23:59:59.999Z`);
+  const { data } = check(await query.order("created_at", { ascending }));
 
-  res.json({ leads: db.prepare(sql).all(...params) });
-});
+  res.json({ leads: data });
+}));
 
 /* ============================================================
    ADMIN: CSV download (opens directly in Excel)
    ============================================================ */
-app.get("/api/admin/leads.csv", requireAuth, (req, res) => {
-  const rows = db.prepare("SELECT id, name, email, phone, message, source, created_at FROM leads ORDER BY created_at DESC").all();
+app.get("/api/admin/leads.csv", requireAuth, safe(async (req, res) => {
+  const { data: rows } = check(
+    await supabase.from(LEADS).select(LEAD_COLUMNS).order("created_at", { ascending: false })
+  );
   const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const header = "ID,Name,Email,Phone,Message,Source,Date (UTC)";
   const body = rows.map(r => [r.id, r.name, r.email, r.phone, r.message, r.source, r.created_at].map(esc).join(","));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="mount-quintaa-leads-${new Date().toISOString().slice(0, 10)}.csv"`);
-  res.send("\uFEFF" + [header, ...body].join("\r\n")); // BOM so Excel reads UTF-8
-});
+  res.send("﻿" + [header, ...body].join("\r\n")); // BOM so Excel reads UTF-8
+}));
 
 /* ============================================================
    ADMIN: delete a lead (data-deletion path for privacy requests)
    ============================================================ */
-app.delete("/api/admin/leads/:id", requireAuth, (req, res) => {
+app.delete("/api/admin/leads/:id", requireAuth, safe(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
-  const info = db.prepare("DELETE FROM leads WHERE id = ?").run(id);
-  res.json({ ok: true, deleted: info.changes });
-});
+  const { count } = check(await supabase.from(LEADS).delete({ count: "exact" }).eq("id", id));
+  res.json({ ok: true, deleted: count });
+}));
 
 /* ============================================================
    BLOGS — public read
    ============================================================ */
-app.get("/api/blogs", (req, res) => {
-  const rows = db.prepare(
-    "SELECT id, title, slug, excerpt, cover_url, created_at FROM blogs WHERE status = 'published' ORDER BY created_at DESC"
-  ).all();
-  res.json({ blogs: rows });
-});
+app.get("/api/blogs", safe(async (req, res) => {
+  const { data } = check(
+    await supabase.from(BLOGS)
+      .select("id, title, slug, excerpt, cover_url, created_at")
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+  );
+  res.json({ blogs: data });
+}));
 
-app.get("/api/blogs/:slug", (req, res) => {
+app.get("/api/blogs/:slug", safe(async (req, res) => {
   const slug = clean(req.params.slug, 160);
-  const post = db.prepare("SELECT * FROM blogs WHERE slug = ? AND status = 'published'").get(slug);
+  const { data: post } = check(
+    await supabase.from(BLOGS).select("*").eq("slug", slug).eq("status", "published").maybeSingle()
+  );
   if (!post) return res.status(404).json({ error: "Post not found" });
   res.json({ blog: post });
-});
+}));
 
 /* ============================================================
    BLOGS — admin write
@@ -238,70 +225,75 @@ function validBlog(body) {
   return { title, excerpt, content, cover_url, status };
 }
 
-app.post("/api/admin/blogs", requireAuth, (req, res) => {
+app.post("/api/admin/blogs", requireAuth, safe(async (req, res) => {
   const v = validBlog(req.body);
   if (v.error) return res.status(400).json({ error: v.error });
   let slug = slugify(v.title) || "post";
   // guarantee unique slug
   let i = 1, base = slug;
-  while (db.prepare("SELECT 1 FROM blogs WHERE slug = ?").get(slug)) slug = `${base}-${++i}`;
-  db.prepare(
-    "INSERT INTO blogs (title, slug, excerpt, content, cover_url, status) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(v.title, slug, v.excerpt, v.content, v.cover_url, v.status);
+  for (;;) {
+    const { data } = check(await supabase.from(BLOGS).select("id").eq("slug", slug).maybeSingle());
+    if (!data) break;
+    slug = `${base}-${++i}`;
+  }
+  check(await supabase.from(BLOGS).insert({ ...v, slug }));
   res.status(201).json({ ok: true, slug });
-});
+}));
 
 /* Admin: full list including drafts, with content stats */
-app.get("/api/admin/blogs", requireAuth, (req, res) => {
-  const rows = db.prepare(
-    "SELECT id, title, slug, excerpt, cover_url, status, created_at, updated_at, length(content) AS content_len FROM blogs ORDER BY created_at DESC"
-  ).all();
-  res.json({ blogs: rows });
-});
+app.get("/api/admin/blogs", requireAuth, safe(async (req, res) => {
+  const { data } = check(
+    await supabase.from(BLOGS)
+      .select("id, title, slug, excerpt, cover_url, status, created_at, updated_at, content")
+      .order("created_at", { ascending: false })
+  );
+  const blogs = data.map(({ content, ...b }) => ({ ...b, content_len: (content || "").length }));
+  res.json({ blogs });
+}));
 
 /* Admin: single post by id (works for drafts too) */
-app.get("/api/admin/blogs/:id", requireAuth, (req, res) => {
+app.get("/api/admin/blogs/:id", requireAuth, safe(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
-  const post = db.prepare("SELECT * FROM blogs WHERE id = ?").get(id);
+  const { data: post } = check(await supabase.from(BLOGS).select("*").eq("id", id).maybeSingle());
   if (!post) return res.status(404).json({ error: "Post not found" });
   res.json({ blog: post });
-});
+}));
 
-app.put("/api/admin/blogs/:id", requireAuth, (req, res) => {
+app.put("/api/admin/blogs/:id", requireAuth, safe(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
   const v = validBlog(req.body);
   if (v.error) return res.status(400).json({ error: v.error });
-  const info = db.prepare(
-    "UPDATE blogs SET title=?, excerpt=?, content=?, cover_url=?, status=?, updated_at=datetime('now') WHERE id=?"
-  ).run(v.title, v.excerpt, v.content, v.cover_url, v.status, id);
-  if (!info.changes) return res.status(404).json({ error: "Post not found" });
+  const { count } = check(
+    await supabase.from(BLOGS)
+      .update({ ...v, updated_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", id)
+  );
+  if (!count) return res.status(404).json({ error: "Post not found" });
   res.json({ ok: true });
-});
+}));
 
-app.delete("/api/admin/blogs/:id", requireAuth, (req, res) => {
+app.delete("/api/admin/blogs/:id", requireAuth, safe(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
-  const info = db.prepare("DELETE FROM blogs WHERE id = ?").run(id);
-  res.json({ ok: true, deleted: info.changes });
-});
+  const { count } = check(await supabase.from(BLOGS).delete({ count: "exact" }).eq("id", id));
+  res.json({ ok: true, deleted: count });
+}));
 
 /* ============================================================
    BLOGS — cover image upload (admin)
-   Raw binary body; magic-byte verified; saved to public/uploads
+   Raw binary body; magic-byte verified; saved to Supabase Storage
    ============================================================ */
-const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
 app.post(
   "/api/admin/upload",
   requireAuth,
-  express.raw({ type: ["image/png", "image/jpeg", "image/webp"], limit: "6mb" }),
-  (req, res) => {
+  // Vercel rejects request bodies over 4.5 MB
+  express.raw({ type: ["image/png", "image/jpeg", "image/webp"], limit: "4mb" }),
+  safe(async (req, res) => {
     const buf = req.body;
     if (!Buffer.isBuffer(buf) || buf.length < 100)
-      return res.status(400).json({ error: "No image received. Choose a PNG, JPG or WebP file." });
+      return res.status(400).json({ error: "No image received. Choose a PNG, JPG or WebP file (max 4 MB)." });
     // Verify real file type by magic bytes — never trust the header alone
     let ext = null;
     if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) ext = "png";
@@ -309,23 +301,30 @@ app.post(
     else if (buf.slice(0, 4).toString("ascii") === "RIFF" && buf.slice(8, 12).toString("ascii") === "WEBP") ext = "webp";
     if (!ext) return res.status(400).json({ error: "Only PNG, JPG or WebP images are allowed." });
     const name = Date.now().toString(36) + "-" + crypto.randomBytes(6).toString("hex") + "." + ext;
-    fs.writeFileSync(path.join(UPLOAD_DIR, name), buf);
-    res.status(201).json({ url: "/uploads/" + name });
-  }
+    const contentType = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    check(await supabase.storage.from(BUCKET).upload(name, buf, { contentType }));
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(name);
+    res.status(201).json({ url: data.publicUrl });
+  })
 );
 
-/* ---------- Static site ---------- */
+/* ---------- Static site (local only; on Vercel public/ is served directly) ---------- */
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 
 /* ---------- Generic error handler (no stack traces to client) ---------- */
 app.use((err, req, res, _next) => {
   const id = errorId();
-  console.error(`[${id}]`, err);
-  res.status(500).json({ error: "Unexpected error (ref " + id + ")" });
+  console.error(`[${id}]`, err.message || err);
+  res.status(500).json({ error: "Something went wrong. Please try again. (ref " + id + ")" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Mount Quintaa running → http://localhost:${PORT}`);
-  console.log(`Admin panel          → http://localhost:${PORT}/admin`);
-  if (!isProd) console.log("(development mode)");
-});
+module.exports = app;
+
+// Start a server only when run directly (`npm run dev`); Vercel imports the app instead.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Mount Quintaa running → http://localhost:${PORT}`);
+    console.log(`Admin panel          → http://localhost:${PORT}/admin`);
+    if (!isProd) console.log("(development mode)");
+  });
+}

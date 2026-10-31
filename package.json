@@ -2,10 +2,10 @@
   "name": "mountquintaa",
   "version": "1.0.0",
   "private": true,
-  "description": "Mount Quintaa - website, admin panel and bookings API",
+  "description": "Mount Quintaa - website, enquiry form and admin panel (Supabase)",
   "scripts": {
-    "dev": "node start.js",
-    "start": "node start.js",
-    "setup": "npm install --prefix api && npm install --prefix website"
+    "dev": "npm --prefix website run dev",
+    "start": "npm --prefix website start",
+    "setup": "npm install --prefix website"
   }
 }

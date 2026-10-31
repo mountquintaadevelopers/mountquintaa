@@ -10,7 +10,7 @@
 (async () => {
   const esc = s => String(s ?? "").replace(/[&<>"']/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fmtDate = utc => new Date(utc.replace(" ", "T") + "Z")
+  const fmtDate = utc => new Date(utc)
     .toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
   const FALLBACK = "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80";
 

@@ -2,40 +2,44 @@
 
 ```
 api.mountquintaa.com/
-├── package.json   ← "npm run dev" starts everything
-├── start.js       ← the runner behind that command
-├── api/           ← bookings API (Express + Prisma + MariaDB)  → http://localhost:4231/v1
-├── website/       ← website + admin panel (Express + SQLite)   → http://localhost:3000
-└── backups/       ← old SQL dumps and duplicate files, not used by the app
+├── package.json        ← "npm run dev" runs the website locally
+└── website/            ← website, enquiry form and admin panel
+    ├── public/         ← the pages visitors see (admin panel in public/admin/)
+    ├── server.js       ← API: enquiry form, admin login, leads, blogs
+    ├── api/index.js    ← Vercel entry point (loads server.js)
+    ├── vercel.json     ← Vercel routing
+    └── supabase/schema.sql ← tables + image bucket to create in Supabase
 ```
 
-## Run it
+Enquiries, blog posts and blog images are stored in **Supabase**. There is no local database.
+
+## Run it locally
 
 ```bash
-npm run dev
+npm run setup     # first time only
+npm run dev       # http://localhost:3000   admin: "Admin Login" on the home page
 ```
 
-This starts MariaDB (if it isn't already running), the bookings API and the website.
-Press **Ctrl+C** to stop all of them.
+`website/.env` needs the values listed in `website/.env.example`.
 
-- Website: http://localhost:3000
-- Admin panel: click **Admin Login** at the top of the home page, or go to http://localhost:3000/admin
+## Supabase setup (once)
 
-## First-time setup on a new computer
+Supabase dashboard → **SQL Editor** → paste `website/supabase/schema.sql` → **Run**.
+It creates the `leads` and `blogs` tables (locked with row-level security) and a public
+`blog-images` storage bucket.
 
-1. Install Node.js 22.13+ and MariaDB.
-2. `npm run setup` installs packages in both folders.
-3. Create `api/.env` and `website/.env` (see each folder's README and `.env.example`).
-4. `npm run dev`
+## Deploy on Vercel
 
-If MariaDB is installed somewhere other than `C:\Program Files\MariaDB 13.0\bin`,
-set the `MARIADB_BIN` environment variable to its `bin` folder.
+1. Import the GitHub repo in Vercel and set **Root Directory** to `website`.
+2. Framework preset: **Other**. Leave the build command empty.
+3. Add these **Environment Variables**:
 
-## Admin logins
-
-| Where | Login |
+| Name | Value |
 |---|---|
-| Website admin panel (`/admin`) | `ADMIN_USER` and the password whose hash is in `website/.env` |
-| Bookings API (`POST /v1/admin/auth/login`) | Admin accounts in the MariaDB `AdminUser` table |
-
-Change the website admin password with `npm run make-password` inside `website/`.
+| `ADMIN_USER` | admin username |
+| `ADMIN_PASSWORD_HASH` | output of `npm run make-password` (inside `website/`) |
+| `JWT_SECRET` | 32+ random characters |
+| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` key |
+| `ALLOWED_ORIGIN` | `https://mountquintaa.com,https://www.mountquintaa.com` |
+| `NODE_ENV` | `production` |

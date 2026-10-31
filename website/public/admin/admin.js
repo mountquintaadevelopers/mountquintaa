@@ -80,8 +80,8 @@ const escHTML = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 function fmtDate(utc) {
-  // SQLite stores UTC "YYYY-MM-DD HH:MM:SS" → show in local time (IST on your machine)
-  const d = new Date(utc.replace(" ", "T") + "Z");
+  // Supabase returns ISO timestamps with a time zone ("2026-10-31T10:00:00+00:00") → show in local time (IST)
+  const d = new Date(utc);
   return d.toLocaleString("en-IN", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit"
@@ -112,7 +112,7 @@ function renderTable() {
 function renderStats() {
   const now = Date.now();
   const day = 86_400_000;
-  const ts = l => new Date(l.created_at.replace(" ", "T") + "Z").getTime();
+  const ts = l => new Date(l.created_at).getTime();
   const todayStr = new Date().toDateString();
   $("statTotal").textContent = LEADS.length;
   $("statToday").textContent = LEADS.filter(l => new Date(ts(l)).toDateString() === todayStr).length;
@@ -201,7 +201,7 @@ function renderBlogStats() {
   $("bStatPub").textContent = pub.length;
   $("bStatDraft").textContent = BLOGS.length - pub.length;
   $("bStatLast").textContent = pub.length
-    ? new Date(pub[0].created_at.replace(" ", "T") + "Z")
+    ? new Date(pub[0].created_at)
         .toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
     : "—";
 }
@@ -389,8 +389,8 @@ $("b-file").addEventListener("change", async e => {
   const file = e.target.files[0];
   if (!file) return;
   const note = $("uploadNote");
-  if (file.size > 5 * 1024 * 1024) {
-    note.textContent = "Image too large — keep it under 5 MB.";
+  if (file.size > 4 * 1024 * 1024) {
+    note.textContent = "Image too large — keep it under 4 MB.";
     return;
   }
   note.textContent = "Uploading…";
