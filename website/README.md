@@ -45,12 +45,14 @@ npm run dev               # http://localhost:3000  |  admin at /admin
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key — server only, never in `public/` |
 | `ADMIN_USER` | Admin login username |
 | `ADMIN_PASSWORD_HASH` | bcrypt hash from `npm run make-password` — never the plain password |
+| `BLOG_USER` | Optional: blog writer login username (Blogs section only, no access to leads) |
+| `BLOG_PASSWORD_HASH` | Optional: bcrypt hash from `npm run make-password` for the blog writer |
 | `JWT_SECRET` | 32+ random characters for signing login tokens |
 | `ALLOWED_ORIGIN` | Your live domain(s), comma-separated, in production |
 
 ## Security built in
 - No secrets in code — everything in `.env` (git-ignored)
-- Admin password stored as bcrypt hash only; JWT sessions expire in 8 h
+- Admin and blog writer passwords stored as bcrypt hashes only; JWT sessions expire in 8 h
 - Rate limiting: 5 form submissions/min and 5 login attempts/min per IP
 - All DB access via the Supabase client's parameterised queries (no SQL injection)
 - Supabase tables use row-level security with no public policies — only the server can read enquiries

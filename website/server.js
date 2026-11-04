@@ -4,10 +4,11 @@
    ------------------------------------------------------------
    Endpoints
      POST /api/leads          public   — save a form submission
-     POST /api/admin/login    public   — admin login → JWT
-     GET  /api/admin/leads    private  — list leads (sort/filter)
-     GET  /api/admin/leads.csv private — CSV download (Excel)
-     DELETE /api/admin/leads/:id private — delete a lead
+     POST /api/admin/login    public   — admin or blog writer login → JWT
+     GET  /api/admin/leads    admin    — list leads (sort/filter)
+     GET  /api/admin/leads.csv admin   — CSV download (Excel)
+     DELETE /api/admin/leads/:id admin — delete a lead
+     /api/admin/blogs, /api/admin/upload  admin or blog writer
    Runs locally with `npm run dev`, and on Vercel through api/index.js.
    ============================================================ */
 "use strict";
@@ -49,6 +50,13 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const LEADS = process.env.SUPABASE_LEADS_TABLE || "leads";
 const BLOGS = process.env.SUPABASE_BLOGS_TABLE || "blogs";
 const BUCKET = process.env.SUPABASE_BUCKET || "blog-images";
+
+/* Who can sign in. The blog writer is optional: without BLOG_USER and
+   BLOG_PASSWORD_HASH only the admin account exists. */
+const ACCOUNTS = [
+  { role: "admin", user: process.env.ADMIN_USER, hash: process.env.ADMIN_PASSWORD_HASH },
+  { role: "blogger", user: process.env.BLOG_USER, hash: process.env.BLOG_PASSWORD_HASH }
+].filter(a => a.user && a.hash);
 
 /* Throw on a Supabase error so every route reports it the same way */
 function check({ data, error, count }) {
@@ -105,6 +113,12 @@ function requireAuth(req, res, next) {
   }
 }
 
+/* Enquiries are admin-only: use after requireAuth */
+function requireAdmin(req, res, next) {
+  if (req.admin.role !== "admin") return res.status(403).json({ error: "Admin access only" });
+  next();
+}
+
 /* ============================================================
    PUBLIC: save a lead
    ============================================================ */
@@ -129,17 +143,18 @@ app.post("/api/leads", leadLimiter, safe(async (req, res) => {
 }));
 
 /* ============================================================
-   ADMIN: login → JWT (8-hour expiry)
+   ADMIN / BLOG WRITER: login → JWT (8-hour expiry)
    ============================================================ */
 app.post("/api/admin/login", loginLimiter, async (req, res) => {
   const user = clean(req.body.username, 50);
   const pass = String(req.body.password ?? "");
-  const validUser = user === process.env.ADMIN_USER;
-  const validPass = await bcrypt.compare(pass, process.env.ADMIN_PASSWORD_HASH);
-  if (!validUser || !validPass)
+  const account = ACCOUNTS.find(a => a.user === user);
+  // Compare even for an unknown username, so both failures take the same time
+  const validPass = await bcrypt.compare(pass, (account || ACCOUNTS[0]).hash);
+  if (!account || !validPass)
     return res.status(401).json({ error: "Wrong username or password." });
-  const token = jwt.sign({ role: "admin", user }, process.env.JWT_SECRET, { expiresIn: "8h" });
-  res.json({ token });
+  const token = jwt.sign({ role: account.role, user }, process.env.JWT_SECRET, { expiresIn: "8h" });
+  res.json({ token, role: account.role });
 });
 
 /* ============================================================
@@ -147,7 +162,7 @@ app.post("/api/admin/login", loginLimiter, async (req, res) => {
    ============================================================ */
 const LEAD_COLUMNS = "id, name, email, phone, message, source, created_at";
 
-app.get("/api/admin/leads", requireAuth, safe(async (req, res) => {
+app.get("/api/admin/leads", requireAuth, requireAdmin, safe(async (req, res) => {
   const ascending = req.query.sort === "asc";
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || "") ? req.query.from : null;
   const to = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to || "") ? req.query.to : null;
@@ -163,7 +178,7 @@ app.get("/api/admin/leads", requireAuth, safe(async (req, res) => {
 /* ============================================================
    ADMIN: CSV download (opens directly in Excel)
    ============================================================ */
-app.get("/api/admin/leads.csv", requireAuth, safe(async (req, res) => {
+app.get("/api/admin/leads.csv", requireAuth, requireAdmin, safe(async (req, res) => {
   const { data: rows } = check(
     await supabase.from(LEADS).select(LEAD_COLUMNS).order("created_at", { ascending: false })
   );
@@ -178,7 +193,7 @@ app.get("/api/admin/leads.csv", requireAuth, safe(async (req, res) => {
 /* ============================================================
    ADMIN: delete a lead (data-deletion path for privacy requests)
    ============================================================ */
-app.delete("/api/admin/leads/:id", requireAuth, safe(async (req, res) => {
+app.delete("/api/admin/leads/:id", requireAuth, requireAdmin, safe(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
   const { count } = check(await supabase.from(LEADS).delete({ count: "exact" }).eq("id", id));

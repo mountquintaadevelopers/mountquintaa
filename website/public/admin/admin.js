@@ -10,16 +10,23 @@ const API_BASE = "";
 
 const $ = id => document.getElementById(id);
 let TOKEN = sessionStorage.getItem("mq_admin_token") || null;
+let ROLE = sessionStorage.getItem("mq_admin_role") || "admin";
 let LEADS = [];
 
 /* ---------- View switching ---------- */
 function showDashboard() {
   $("loginScreen").classList.add("hidden");
   $("dashboard").classList.remove("hidden");
-  loadLeads();
+  // The blog writer only gets the Blogs tab (the server blocks leads too)
+  const isWriter = ROLE === "blogger";
+  $("dashTitle").textContent = isWriter ? "Blog Writer" : "Lead Enquiries";
+  $("tabBar").classList.toggle("hidden", isWriter);
+  openTab(isWriter ? "blogs" : "leads");
+  if (!isWriter) loadLeads();
 }
 function showLogin() {
   sessionStorage.removeItem("mq_admin_token");
+  sessionStorage.removeItem("mq_admin_role");
   TOKEN = null;
   $("dashboard").classList.add("hidden");
   $("loginScreen").classList.remove("hidden");
@@ -42,7 +49,9 @@ $("loginForm").addEventListener("submit", async e => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Login failed");
     TOKEN = data.token;
+    ROLE = data.role;
     sessionStorage.setItem("mq_admin_token", TOKEN);
+    sessionStorage.setItem("mq_admin_role", ROLE);
     e.target.reset();
     showDashboard();
   } catch (ex) {
@@ -167,13 +176,14 @@ $("dateHeader").addEventListener("click", () => {
 });
 
 /* ---------- Tabs ---------- */
+function openTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  $("tab-leads").classList.toggle("hidden", name !== "leads");
+  $("tab-blogs").classList.toggle("hidden", name !== "blogs");
+  if (name === "blogs") loadBlogs();
+}
 document.querySelectorAll(".tab").forEach(tab =>
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
-    $("tab-leads").classList.toggle("hidden", tab.dataset.tab !== "leads");
-    $("tab-blogs").classList.toggle("hidden", tab.dataset.tab !== "blogs");
-    if (tab.dataset.tab === "blogs") loadBlogs();
-  })
+  tab.addEventListener("click", () => openTab(tab.dataset.tab))
 );
 
 /* ============================================================

@@ -38,6 +38,8 @@ It creates the `leads` and `blogs` tables (locked with row-level security) and a
 |---|---|
 | `ADMIN_USER` | admin username |
 | `ADMIN_PASSWORD_HASH` | output of `npm run make-password` (inside `website/`) |
+| `BLOG_USER` | blog writer username (optional) |
+| `BLOG_PASSWORD_HASH` | output of `npm run make-password` for the blog writer (optional) |
 | `JWT_SECRET` | 32+ random characters |
 | `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` key |
