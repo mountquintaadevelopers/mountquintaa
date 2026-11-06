@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin — Mount Quintaa Leads</title>
+<title>Login — Mount Quintaa</title>
 <meta name="robots" content="noindex, nofollow" />
 <link rel="icon" href="/assets/submark.png" />
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600&f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
@@ -21,7 +21,13 @@ body{font-family:var(--body);background:var(--stone);color:var(--ink);min-height
 .login-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--olive-dark)}
 .login-card{background:var(--ivory);border-radius:20px;padding:44px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
 .login-card img{height:56px;margin:0 auto 24px;display:block}
-.login-card h1{font-family:var(--heading);font-weight:600;font-size:24px;text-align:center;margin-bottom:28px}
+.login-card h1{font-family:var(--heading);font-weight:600;font-size:24px;text-align:center;margin-bottom:20px}
+.role-pick{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:8px;background:var(--stone);border-radius:999px}
+.role-pick label{position:relative;margin:0;font-size:14px;letter-spacing:0;text-transform:none;cursor:pointer}
+.role-pick input{position:absolute;opacity:0;width:1px;height:1px;padding:0}
+.role-pick span{display:block;padding:10px 8px;border-radius:999px;text-align:center;color:var(--ink);transition:background .2s,color .2s}
+.role-pick input:checked+span{background:var(--olive);color:#fff}
+.role-pick input:focus-visible+span{box-shadow:0 0 0 3px rgba(66,96,1,.3)}
 label{display:block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
 input,select{width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid rgba(30,36,16,.18);font-family:var(--body);font-size:15px;background:#fff}
 input:focus,select:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(66,96,1,.14)}
@@ -37,21 +43,21 @@ input:focus,select:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0
 /* ---- Dashboard ---- */
 .topbar{background:var(--olive-dark);color:var(--ivory);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .topbar img{height:40px}
+.topbar-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:14px}
+.topbar-right a{color:var(--ivory);text-decoration:none}
+.topbar-right a:hover{color:var(--gold)}
 .topbar .title{font-family:var(--heading);font-weight:500;font-size:18px}
 .dash{max-width:1280px;margin:0 auto;padding:32px 24px}
 @media(max-width:640px){
 .dash{padding:20px 14px}.topbar{padding:12px 16px}.topbar img{height:32px}
 .stat-card{padding:16px 18px}.stat-card .num{font-size:26px}
 .controls{padding:16px}.controls .field{min-width:120px}
-.blog-editor,.blog-list{padding:20px 16px}
+.blog-list{padding:20px 16px}
 .list-head{flex-direction:column;align-items:stretch}
 .list-head input{max-width:none;width:100%}
-.editor-actions{flex-wrap:wrap}
-.editor-actions .btn{flex:1;min-width:120px}
 .post-row{flex-direction:column;gap:8px}
 .post-row .p-actions{align-self:flex-start}
 .tabbar{overflow-x:auto;padding-bottom:4px}
-.cover-row{gap:10px}
 }
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
 .stat-card{background:#fff;border-radius:16px;padding:22px 26px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
@@ -78,12 +84,8 @@ tr:hover td{background:var(--ivory)}
 .tab{font-family:var(--heading);font-weight:500;font-size:16px;padding:11px 28px;border-radius:999px;border:1.5px solid var(--olive);background:transparent;color:var(--olive);cursor:pointer;transition:.25s}
 .tab.active{background:var(--olive);color:#fff}
 /* ---- Blog editor ---- */
-.blog-layout{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:start}
-.blog-editor,.blog-list{background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
+.blog-list{background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(30,36,16,.08)}
 .panel-title{font-family:var(--heading);font-weight:600;font-size:20px;margin-bottom:18px}
-.blog-editor textarea{width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid rgba(30,36,16,.18);font-family:var(--body);font-size:15px;resize:vertical}
-.blog-editor textarea:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(66,96,1,.14)}
-.editor-actions{display:flex;gap:12px;margin-top:20px}
 .post-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 0;border-bottom:1px solid rgba(30,36,16,.08)}
 .post-row:last-child{border-bottom:0}
 .post-row .p-title{font-weight:600;font-size:15px}
@@ -93,19 +95,6 @@ tr:hover td{background:var(--ivory)}
 .post-row .edit{color:var(--olive)}
 .post-row .del{color:#a03e2d}
 .post-row a.view{font-size:13px;font-weight:600;color:var(--terracotta);text-decoration:none}
-@media(max-width:900px){.blog-layout{grid-template-columns:1fr}}
-/* ---- Cover upload ---- */
-.cover-row{display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap}
-.upload-btn{padding:10px 20px;font-size:14px;cursor:pointer;user-select:none}
-.upload-note{font-size:13px;color:var(--muted)}
-.cover-preview{max-height:140px;border-radius:12px;margin-top:10px;box-shadow:0 4px 16px rgba(30,36,16,.15)}
-.content-meta{font-size:12px;color:var(--muted);margin-top:6px;text-align:right}
-.live-preview{margin-top:24px;border:1.5px dashed rgba(66,96,1,.4);border-radius:12px;padding:22px;background:var(--ivory)}
-.lp-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
-.lp-title{font-family:var(--heading);font-weight:600;font-size:24px;line-height:1.2;margin-bottom:6px}
-.lp-excerpt{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:12px}
-.lp-cover{max-height:180px;width:100%;object-fit:cover;border-radius:10px;margin:10px 0}
-.lp-body p{font-size:14.5px;line-height:1.7;margin-bottom:12px}
 .list-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
 .list-head input{max-width:220px;padding:10px 14px}
 .filter-chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
@@ -117,6 +106,7 @@ tr:hover td{background:var(--ivory)}
 .post-row .dup{color:#7a6b00}
 @media(max-width:640px){.controls .actions{margin-left:0;width:100%}}
 </style>
+<link rel="stylesheet" href="/admin/editor.css" />
 </head>
 <body>
 
@@ -124,7 +114,11 @@ tr:hover td{background:var(--ivory)}
 <div class="login-screen" id="loginScreen">
   <form class="login-card" id="loginForm" method="post" action="/admin">
     <img src="/assets/logo-dark.png" alt="Mount Quintaa" />
-    <h1>Admin Panel</h1>
+    <h1 id="loginTitle">Admin Login</h1>
+    <div class="role-pick" role="radiogroup" aria-label="Sign in as">
+      <label><input type="radio" name="role" value="admin" checked /><span>Admin</span></label>
+      <label><input type="radio" name="role" value="blogger" /><span>Blog Writer</span></label>
+    </div>
     <label for="lg-user">Username</label>
     <input id="lg-user" name="username" autocomplete="username" required />
     <label for="lg-pass">Password</label>
@@ -139,7 +133,11 @@ tr:hover td{background:var(--ivory)}
   <div class="topbar">
     <img src="/assets/logo-white.png" alt="Mount Quintaa" />
     <span class="title" id="dashTitle">Lead Enquiries</span>
-    <button class="btn btn-outline" id="logoutBtn" style="border-color:var(--gold);color:var(--gold)">Sign Out</button>
+    <div class="topbar-right">
+      <a href="/">← Back to website</a>
+      <span id="whoAmI"></span>
+      <button class="btn btn-outline" id="logoutBtn" style="border-color:var(--gold);color:var(--gold)">Sign Out</button>
+    </div>
   </div>
 
   <div class="dash">
@@ -191,55 +189,19 @@ tr:hover td{background:var(--ivory)}
 
     <!-- ============ BLOGS TAB ============ -->
     <div id="tab-blogs" class="hidden">
-      <div class="stats-row">
-        <div class="stat-card"><div class="num" id="bStatTotal">–</div><div class="lbl">Total Posts</div></div>
-        <div class="stat-card"><div class="num" id="bStatPub">–</div><div class="lbl">Published</div></div>
-        <div class="stat-card"><div class="num" id="bStatDraft">–</div><div class="lbl">Drafts</div></div>
-        <div class="stat-card"><div class="num" id="bStatLast">–</div><div class="lbl">Last Published</div></div>
-      </div>
-
-      <div class="blog-layout">
-        <div class="blog-editor">
-          <h2 class="panel-title" id="editorTitle">Write a New Post</h2>
-          <form id="blogForm">
-            <input type="hidden" id="b-id" />
-            <label for="b-title">Title</label>
-            <input id="b-title" maxlength="160" placeholder="e.g. Managed Farmland 101: What You Actually Own" required />
-            <label for="b-cover">Cover image</label>
-            <div class="cover-row">
-              <label class="btn btn-outline upload-btn" for="b-file">📁 Upload Image</label>
-              <input type="file" id="b-file" accept="image/png,image/jpeg,image/webp" hidden />
-              <span class="upload-note" id="uploadNote">or paste a URL below</span>
-            </div>
-            <input id="b-cover" maxlength="500" placeholder="https://… (fills automatically after upload)" />
-            <img id="coverPreview" class="cover-preview hidden" alt="Cover preview" />
-            <label for="b-excerpt">Excerpt (short teaser, optional)</label>
-            <input id="b-excerpt" maxlength="300" placeholder="One or two lines shown on the Blogs page" />
-            <label for="b-content">Content</label>
-            <textarea id="b-content" rows="14" placeholder="Write your post here. Leave one empty line between paragraphs."></textarea>
-            <div class="content-meta"><span id="wordCount">0 words · 0 min read</span></div>
-            <label for="b-status">Status</label>
-            <select id="b-status">
-              <option value="published">Published — visible on the website</option>
-              <option value="draft">Draft — only visible here</option>
-            </select>
-            <div class="editor-actions">
-              <button class="btn btn-olive" type="submit" id="saveBlogBtn" style="width:auto;margin:0">Publish Post</button>
-              <button class="btn btn-outline" type="button" id="previewBtn">Preview</button>
-              <button class="btn btn-outline hidden" type="button" id="cancelEditBtn">Cancel Edit</button>
-            </div>
-            <div class="err-msg" id="blogErr" style="text-align:left"></div>
-          </form>
-          <div id="livePreview" class="live-preview hidden">
-            <div class="lp-label">Preview — how it will look on the site</div>
-            <div id="lpInner"></div>
-          </div>
+      <div id="blogListView">
+        <div class="stats-row">
+          <div class="stat-card"><div class="num" id="bStatTotal">–</div><div class="lbl">Total Posts</div></div>
+          <div class="stat-card"><div class="num" id="bStatPub">–</div><div class="lbl">Published</div></div>
+          <div class="stat-card"><div class="num" id="bStatDraft">–</div><div class="lbl">Drafts</div></div>
+          <div class="stat-card"><div class="num" id="bStatLast">–</div><div class="lbl">Last Published</div></div>
         </div>
 
         <div class="blog-list">
           <div class="list-head">
             <h2 class="panel-title" style="margin:0">Posts</h2>
             <input type="search" id="blogSearch" placeholder="Search posts…" />
+            <button class="btn btn-olive" type="button" id="newPostBtn" style="width:auto;margin:0">+ New Post</button>
           </div>
           <div class="filter-chips">
             <button class="chip active" data-filter="all">All</button>
@@ -250,11 +212,128 @@ tr:hover td{background:var(--ivory)}
           <div class="empty-state hidden" id="blogEmpty">Nothing here yet — write your first post!</div>
         </div>
       </div>
+
+      <!-- ============ WRITING SCREEN ============ -->
+      <div id="blogEditorView" class="hidden">
+        <div class="ed-bar">
+          <div class="ed-row">
+            <button type="button" class="ed-back" id="edBack">← Blogs</button>
+            <span class="status-badge draft" id="edBadge">draft</span>
+            <span class="ed-state" id="edState"></span>
+            <div class="ed-actions">
+              <button type="button" class="ed-btn" id="edTemplatesBtn">Import from template</button>
+              <button type="button" class="ed-btn" id="edPreview">Preview</button>
+              <button type="button" class="ed-btn danger" id="edDelete">Delete draft</button>
+              <button type="button" class="ed-btn" id="edSave" disabled>Save draft</button>
+              <div class="ed-publish">
+                <button type="button" class="main" id="edPublish">Publish</button>
+                <button type="button" class="more" id="edMore" aria-label="More publish options">▾</button>
+                <div class="ed-menu hidden" id="edMenu">
+                  <button type="button" id="edPublishNow">Publish now</button>
+                  <button type="button" id="edToDraft">Move back to draft</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ed-add" id="edAddBar">
+            <span>+ ADD</span>
+            <button type="button" class="ed-chip" data-type="intro">Intro</button>
+            <button type="button" class="ed-chip" data-type="h2">H2</button>
+            <button type="button" class="ed-chip" data-type="h3">H3</button>
+            <button type="button" class="ed-chip" data-type="paragraph">Paragraph</button>
+            <button type="button" class="ed-chip" data-type="list">List</button>
+            <button type="button" class="ed-chip" data-type="table">Table</button>
+            <button type="button" class="ed-chip" data-type="tip">Tip</button>
+            <button type="button" class="ed-chip" data-type="warning">Warning</button>
+            <button type="button" class="ed-chip" data-type="image">Image</button>
+            <button type="button" class="ed-chip" data-type="quote">Quote</button>
+            <button type="button" class="ed-chip" data-type="services">Pages</button>
+            <button type="button" class="ed-chip" data-type="cta">CTA</button>
+          </div>
+        </div>
+
+        <div class="ed-error hidden" id="edError"></div>
+
+        <div class="ed-layout">
+          <div>
+            <textarea class="ed-title" id="edTitle" rows="1" maxlength="160" placeholder="Untitled post"></textarea>
+            <textarea class="ed-excerpt" id="edExcerpt" rows="1" maxlength="300" placeholder="Excerpt — 1–2 sentences for the blog list and under the title"></textarea>
+            <div id="edBlocks"></div>
+            <div class="ed-faqs">
+              <h3>FAQs</h3>
+              <p>Shown at the end of the post — and to Google as FAQ results. Aim for 4–6.</p>
+              <div id="edFaqList"></div>
+              <button type="button" class="eb-wide" id="edAddFaq">+ Add a question</button>
+            </div>
+          </div>
+
+          <aside class="ed-seo">
+            <div class="ed-score" id="edScore"><span>SEO</span><span id="edScoreText"></span></div>
+
+            <label for="ed-slug">Address</label>
+            <div class="ed-address">/blog?slug=<input type="text" id="ed-slug" maxlength="120" /></div>
+
+            <label for="ed-meta_title">Meta title <span id="edTitleCount">0/60</span></label>
+            <input type="text" id="ed-meta_title" maxlength="200" />
+            <small>Leave empty to use the post title</small>
+
+            <label for="ed-meta_description">Meta description <span id="edDescCount">0/160</span></label>
+            <textarea id="ed-meta_description" maxlength="400"></textarea>
+            <small>Leave empty to use the excerpt</small>
+
+            <label>Google preview</label>
+            <div class="ed-google">
+              <div class="site" id="edGoogleSite"></div>
+              <div class="head" id="edGoogleTitle"></div>
+              <div class="desc" id="edGoogleDesc"></div>
+            </div>
+
+            <label for="ed-keyword">Main keyword</label>
+            <input type="text" id="ed-keyword" maxlength="120" placeholder="e.g. farm plots near bangalore" />
+
+            <label for="ed-tags">Tags</label>
+            <input type="text" id="ed-tags" maxlength="50" placeholder="Press Enter after each tag" />
+            <div class="ed-tags" id="edTags"></div>
+
+            <label for="ed-category">Category</label>
+            <select id="ed-category">
+              <option value="">Choose a category</option>
+              <option>Farmland Guides</option>
+              <option>Lifestyle</option>
+              <option>Project Updates</option>
+            </select>
+
+            <label class="eb-check"><input type="checkbox" id="ed-featured" /> Featured — shown large at the top of /blogs</label>
+
+            <label>Cover image</label>
+            <div id="edCover"></div>
+
+            <label for="ed-author">Author</label>
+            <input type="text" id="ed-author" maxlength="100" />
+
+            <div class="ed-count" id="edWords"></div>
+
+            <label>Checklist</label>
+            <ul class="ed-checks" id="edChecks"></ul>
+          </aside>
+        </div>
+      </div>
+
+      <div class="ed-modal hidden" id="edTemplates">
+        <div class="ed-modal-card">
+          <h2>Import from template</h2>
+          <p>Starts the post with a ready set of blocks. You fill in the words.</p>
+          <div id="edTemplateList"></div>
+          <button type="button" class="ed-btn" id="edTemplatesClose">Cancel</button>
+        </div>
+      </div>
     </div><!-- /tab-blogs -->
   </div>
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="/js/blog-render.js"></script>
 <script src="/admin/admin.js"></script>
+<script src="/admin/editor.js"></script>
 </body>
 </html>

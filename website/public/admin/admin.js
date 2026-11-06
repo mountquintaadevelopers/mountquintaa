@@ -11,6 +11,7 @@ const API_BASE = "";
 const $ = id => document.getElementById(id);
 let TOKEN = sessionStorage.getItem("mq_admin_token") || null;
 let ROLE = sessionStorage.getItem("mq_admin_role") || "admin";
+let USERNAME = sessionStorage.getItem("mq_admin_user") || "";
 let LEADS = [];
 
 /* ---------- View switching ---------- */
@@ -20,6 +21,7 @@ function showDashboard() {
   // The blog writer only gets the Blogs tab (the server blocks leads too)
   const isWriter = ROLE === "blogger";
   $("dashTitle").textContent = isWriter ? "Blog Writer" : "Lead Enquiries";
+  $("whoAmI").textContent = USERNAME;
   $("tabBar").classList.toggle("hidden", isWriter);
   openTab(isWriter ? "blogs" : "leads");
   if (!isWriter) loadLeads();
@@ -27,12 +29,22 @@ function showDashboard() {
 function showLogin() {
   sessionStorage.removeItem("mq_admin_token");
   sessionStorage.removeItem("mq_admin_role");
+  sessionStorage.removeItem("mq_admin_user");
   TOKEN = null;
+  closeEditor();
   $("dashboard").classList.add("hidden");
   $("loginScreen").classList.remove("hidden");
 }
 
 /* ---------- Login ---------- */
+const pickedRole = () => document.querySelector("input[name=role]:checked").value;
+function showPickedRole() {
+  $("loginTitle").textContent = pickedRole() === "blogger" ? "Blog Writer Login" : "Admin Login";
+  $("loginErr").textContent = "";
+}
+document.querySelectorAll("input[name=role]").forEach(r => r.addEventListener("change", showPickedRole));
+showPickedRole();
+
 $("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   const err = $("loginErr");
@@ -43,16 +55,20 @@ $("loginForm").addEventListener("submit", async e => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: $("lg-user").value.trim(),
-        password: $("lg-pass").value
+        password: $("lg-pass").value,
+        role: pickedRole()
       })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Login failed");
     TOKEN = data.token;
     ROLE = data.role;
+    USERNAME = $("lg-user").value.trim();
     sessionStorage.setItem("mq_admin_token", TOKEN);
     sessionStorage.setItem("mq_admin_role", ROLE);
+    sessionStorage.setItem("mq_admin_user", USERNAME);
     e.target.reset();
+    showPickedRole();
     showDashboard();
   } catch (ex) {
     err.textContent = ex.message === "Failed to fetch"
@@ -187,8 +203,8 @@ document.querySelectorAll(".tab").forEach(tab =>
 );
 
 /* ============================================================
-   BLOGS — advanced dashboard: stats, search, filters, drafts,
-   live preview, word count, duplicate
+   BLOGS — post list: stats, search, filters, duplicate.
+   The writing screen itself is in editor.js
    ============================================================ */
 let BLOGS = [];
 let BLOG_FILTER = "all";
@@ -211,7 +227,7 @@ function renderBlogStats() {
   $("bStatPub").textContent = pub.length;
   $("bStatDraft").textContent = BLOGS.length - pub.length;
   $("bStatLast").textContent = pub.length
-    ? new Date(pub[0].created_at)
+    ? new Date(pub[0].published_at || pub[0].created_at)
         .toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
     : "—";
 }
@@ -235,7 +251,7 @@ function renderBlogList() {
           <span class="status-badge ${b.status}">${b.status}</span>
         </div>
         <div class="p-date">
-          ${fmtDate(b.created_at)} · ~${Math.max(1, Math.round((b.content_len || 0) / 5 / 200))} min read
+          ${fmtDate(b.published_at || b.created_at)} · ~${Math.max(1, Math.round((b.content_len || 0) / 5 / 200))} min read
           ${b.status === "published"
             ? ` · <a class="view" href="../blog.html?slug=${encodeURIComponent(b.slug)}" target="_blank" rel="noopener">View on site ↗</a>`
             : ""}
@@ -247,7 +263,7 @@ function renderBlogList() {
         <button class="del" data-id="${b.id}">Delete</button>
       </div>
     </div>`).join("");
-  list.querySelectorAll(".edit").forEach(btn => btn.addEventListener("click", () => startEdit(btn.dataset.id)));
+  list.querySelectorAll(".edit").forEach(btn => btn.addEventListener("click", () => editPost(btn.dataset.id)));
   list.querySelectorAll(".dup").forEach(btn => btn.addEventListener("click", () => duplicatePost(btn.dataset.id)));
   list.querySelectorAll(".del").forEach(btn => btn.addEventListener("click", () => deleteBlog(btn.dataset.id)));
 }
@@ -269,110 +285,6 @@ async function fetchFullPost(id) {
   return (await res.json()).blog || null;
 }
 
-async function startEdit(id) {
-  const blog = await fetchFullPost(id);
-  if (!blog) return;
-  $("b-id").value = blog.id;
-  $("b-title").value = blog.title;
-  $("b-cover").value = blog.cover_url || "";
-  $("b-excerpt").value = blog.excerpt || "";
-  $("b-content").value = blog.content;
-  $("b-status").value = blog.status || "published";
-  refreshPreview();
-  updateWordCount();
-  $("editorTitle").textContent = "Edit Post";
-  $("saveBlogBtn").textContent = "Save Changes";
-  $("cancelEditBtn").classList.remove("hidden");
-  $("b-title").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function duplicatePost(id) {
-  const blog = await fetchFullPost(id);
-  if (!blog) return;
-  resetEditor();
-  $("b-title").value = blog.title + " (copy)";
-  $("b-cover").value = blog.cover_url || "";
-  $("b-excerpt").value = blog.excerpt || "";
-  $("b-content").value = blog.content;
-  $("b-status").value = "draft";           // copies start as drafts
-  refreshPreview();
-  updateWordCount();
-  $("editorTitle").textContent = "Write a New Post (duplicated)";
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function resetEditor() {
-  $("blogForm").reset();
-  $("b-id").value = "";
-  $("b-status").value = "published";
-  $("editorTitle").textContent = "Write a New Post";
-  $("saveBlogBtn").textContent = "Publish Post";
-  $("cancelEditBtn").classList.add("hidden");
-  $("blogErr").textContent = "";
-  $("uploadNote").textContent = "or paste a URL below";
-  coverPreview.classList.add("hidden");
-  $("livePreview").classList.add("hidden");
-  updateWordCount();
-}
-$("cancelEditBtn").addEventListener("click", resetEditor);
-
-/* ---- Word count & reading time ---- */
-function updateWordCount() {
-  const words = ($("b-content").value.trim().match(/\S+/g) || []).length;
-  $("wordCount").textContent = `${words} words · ${Math.max(1, Math.round(words / 200))} min read`;
-}
-$("b-content").addEventListener("input", () => { updateWordCount(); if (!$("livePreview").classList.contains("hidden")) renderLivePreview(); });
-["b-title", "b-excerpt", "b-cover"].forEach(id =>
-  $(id).addEventListener("input", () => { if (!$("livePreview").classList.contains("hidden")) renderLivePreview(); })
-);
-
-/* ---- Live preview ---- */
-function renderLivePreview() {
-  const paras = escHTML($("b-content").value).split(/\n{2,}/)
-    .map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
-  $("lpInner").innerHTML = `
-    <div class="lp-title">${escHTML($("b-title").value) || "Untitled post"}</div>
-    ${$("b-excerpt").value ? `<div class="lp-excerpt">${escHTML($("b-excerpt").value)}</div>` : ""}
-    ${$("b-cover").value ? `<img class="lp-cover" src="${escHTML($("b-cover").value)}" onerror="this.remove()" />` : ""}
-    <div class="lp-body">${paras || "<p>Start typing to see your post…</p>"}</div>`;
-}
-$("previewBtn").addEventListener("click", () => {
-  const panel = $("livePreview");
-  panel.classList.toggle("hidden");
-  $("previewBtn").textContent = panel.classList.contains("hidden") ? "Preview" : "Hide Preview";
-  if (!panel.classList.contains("hidden")) renderLivePreview();
-});
-
-/* ---- Save (create or update) ---- */
-$("blogForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const err = $("blogErr");
-  err.textContent = "";
-  const id = $("b-id").value;
-  const payload = {
-    title: $("b-title").value.trim(),
-    cover_url: $("b-cover").value.trim(),
-    excerpt: $("b-excerpt").value.trim(),
-    content: $("b-content").value.trim(),
-    status: $("b-status").value
-  };
-  try {
-    const res = await fetch(API_BASE + (id ? "/api/admin/blogs/" + id : "/api/admin/blogs"), {
-      method: id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
-      body: JSON.stringify(payload)
-    });
-    if (res.status === 401) return showLogin();
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Could not save the post");
-    resetEditor();
-    loadBlogs();
-  } catch (ex) {
-    err.textContent = ex.message;
-  }
-});
-
 async function deleteBlog(id) {
   if (!confirm("Delete this post permanently?")) return;
   const res = await fetch(API_BASE + "/api/admin/blogs/" + id, {
@@ -382,46 +294,6 @@ async function deleteBlog(id) {
   if (res.status === 401) return showLogin();
   loadBlogs();
 }
-
-/* ---------- Cover image upload ---------- */
-const coverInput = $("b-cover");
-const coverPreview = $("coverPreview");
-
-function refreshPreview() {
-  const url = coverInput.value.trim();
-  coverPreview.classList.toggle("hidden", !url);
-  if (url) coverPreview.src = url;
-}
-coverInput.addEventListener("change", refreshPreview);
-coverPreview.addEventListener("error", () => coverPreview.classList.add("hidden"));
-
-$("b-file").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const note = $("uploadNote");
-  if (file.size > 4 * 1024 * 1024) {
-    note.textContent = "Image too large — keep it under 4 MB.";
-    return;
-  }
-  note.textContent = "Uploading…";
-  try {
-    const res = await fetch(API_BASE + "/api/admin/upload", {
-      method: "POST",
-      headers: { "Content-Type": file.type, Authorization: "Bearer " + TOKEN },
-      body: file
-    });
-    if (res.status === 401) return showLogin();
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Upload failed");
-    coverInput.value = data.url;
-    refreshPreview();
-    note.textContent = "Uploaded ✓";
-  } catch (ex) {
-    note.textContent = ex.message;
-  } finally {
-    e.target.value = "";
-  }
-});
 
 /* ---------- Boot ---------- */
 if (TOKEN) showDashboard();

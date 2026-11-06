@@ -28,6 +28,20 @@ create table if not exists public.blogs (
 );
 create index if not exists idx_blogs_created on public.blogs (created_at);
 
+-- Block editor fields. "content" stays as a plain-text copy of the post, used
+-- for word counts and for older posts written before blocks existed.
+alter table public.blogs
+  add column if not exists blocks           jsonb not null default '[]',
+  add column if not exists faqs             jsonb not null default '[]',
+  add column if not exists meta_title       text default '',
+  add column if not exists meta_description text default '',
+  add column if not exists keyword          text default '',
+  add column if not exists tags             text[] not null default '{}',
+  add column if not exists category         text default '',
+  add column if not exists featured         boolean not null default false,
+  add column if not exists author           text not null default 'Mount Quintaa Team',
+  add column if not exists published_at     timestamptz;
+
 -- Lock both tables: with RLS on and no policies, nobody can read or write them
 -- with the public (anon) key. Only the website server, using the service-role
 -- key, can - so visitors can't read other people's enquiries.

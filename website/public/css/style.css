@@ -373,6 +373,12 @@ body>.accordion-item{background:var(--color-ivory)}
 }
 .read-more:hover{gap:14px}
 @media(max-width:900px){.journal-grid{grid-template-columns:1fr}}
+.j-card.j-featured{flex-direction:row;margin-bottom:32px}
+.j-card.j-featured>a{flex:1.2;min-width:0}
+.j-card.j-featured .img{aspect-ratio:auto;height:100%;min-height:300px}
+.j-card.j-featured .body{flex:1;justify-content:center}
+.j-card.j-featured h3{font-size:28px}
+@media(max-width:760px){.j-card.j-featured{flex-direction:column}.j-card.j-featured .img{min-height:0;aspect-ratio:16/10}}
 
 /* ---------- CTA band ---------- */
 .cta-band{

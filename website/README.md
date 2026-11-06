@@ -16,9 +16,10 @@ website/
 │   ├── about.html        ← About Us
 │   ├── projects.html     ← Projects (Quintaa Greens)
 │   ├── contact.html      ← Contact + main enquiry form
-│   ├── admin/            ← Admin panel (login + dashboard)
+│   ├── admin/            ← Admin panel (login, dashboard, blog writing screen)
 │   ├── css/style.css     ← Design system (colors, type, components)
 │   ├── js/main.js        ← Shared behaviour + form submission
+│   ├── js/blog-render.js ← Turns a post's blocks into the article (site + admin)
 │   └── assets/           ← Logos
 ├── server.js             ← Backend API + static file server (local)
 ├── api/index.js          ← Vercel entry point, loads server.js

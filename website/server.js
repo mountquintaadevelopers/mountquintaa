@@ -9,6 +9,7 @@
      GET  /api/admin/leads.csv admin   — CSV download (Excel)
      DELETE /api/admin/leads/:id admin — delete a lead
      /api/admin/blogs, /api/admin/upload  admin or blog writer
+     GET  /api/blogs, /api/blogs/:slug    public — published posts
    Runs locally with `npm run dev`, and on Vercel through api/index.js.
    ============================================================ */
 "use strict";
@@ -88,6 +89,8 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE"]
   })
 );
+// Blog posts are stored as blocks, so a long article needs more room than a form
+app.use("/api/admin/blogs", express.json({ limit: "512kb" }));
 app.use(express.json({ limit: "64kb" }));
 
 /* Rate limits: lead form 5/min per IP; login 5/min per IP */
@@ -148,7 +151,9 @@ app.post("/api/leads", leadLimiter, safe(async (req, res) => {
 app.post("/api/admin/login", loginLimiter, async (req, res) => {
   const user = clean(req.body.username, 50);
   const pass = String(req.body.password ?? "");
-  const account = ACCOUNTS.find(a => a.user === user);
+  // The login page sends which account was picked (Admin or Blog Writer)
+  const role = req.body.role;
+  const account = ACCOUNTS.find(a => a.user === user && (!role || a.role === role));
   // Compare even for an unknown username, so both failures take the same time
   const validPass = await bcrypt.compare(pass, (account || ACCOUNTS[0]).hash);
   if (!account || !validPass)
@@ -203,14 +208,19 @@ app.delete("/api/admin/leads/:id", requireAuth, requireAdmin, safe(async (req, r
 /* ============================================================
    BLOGS — public read
    ============================================================ */
+/* Posts count from the day they went live, not the day the draft was started */
+const postDate = b => new Date(b.published_at || b.created_at).getTime();
+
 app.get("/api/blogs", safe(async (req, res) => {
   const { data } = check(
     await supabase.from(BLOGS)
-      .select("id, title, slug, excerpt, cover_url, created_at")
+      .select("id, title, slug, excerpt, cover_url, created_at, published_at, category, tags, author, featured, content")
       .eq("status", "published")
-      .order("created_at", { ascending: false })
   );
-  res.json({ blogs: data });
+  const blogs = data
+    .map(({ content, ...b }) => ({ ...b, content_len: (content || "").length }))
+    .sort((a, b) => postDate(b) - postDate(a));
+  res.json({ blogs });
 }));
 
 app.get("/api/blogs/:slug", safe(async (req, res) => {
@@ -227,42 +237,99 @@ app.get("/api/blogs/:slug", safe(async (req, res) => {
    ============================================================ */
 const slugify = t => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120);
 
+/* Keeps new lines, unlike clean() */
+const text = (v, max) => String(v ?? "").slice(0, max);
+const validImage = url => /^(https:\/\/|\/uploads\/)/.test(url);
+
+/* Keep only the fields each block type uses */
+function cleanBlock(b) {
+  const type = b?.type;
+  switch (type) {
+    case "intro": case "paragraph": case "tip": case "warning": case "quote":
+      return { type, text: text(b.text, 20_000) };
+    case "h2": case "h3":
+      return { type, text: clean(b.text, 200) };
+    case "list":
+      return { type, text: text(b.text, 20_000), numbered: !!b.numbered };
+    case "table": {
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 60)
+        .map(r => (Array.isArray(r) ? r : []).slice(0, 10).map(c => text(c, 1000)));
+      return { type, rows };
+    }
+    case "image": {
+      const url = clean(b.url, 500);
+      return { type, url: validImage(url) ? url : "", alt: clean(b.alt, 300), caption: clean(b.caption, 300), credit: clean(b.credit, 200) };
+    }
+    case "services": {
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12)
+        .map(i => ({ page: clean(i?.page, 40), why: clean(i?.why, 300) }));
+      return { type, items };
+    }
+    case "cta":
+      return { type, text: text(b.text, 1000), label: clean(b.label, 80), link: clean(b.link, 500) };
+    default:
+      return null;
+  }
+}
+
 function validBlog(body) {
-  const title = clean(body.title, 160);
-  const excerpt = clean(body.excerpt, 300);
-  const content = String(body.content ?? "").trim().slice(0, 50_000);
-  const cover_url = clean(body.cover_url, 500);
-  if (title.length < 3) return { error: "Title must be at least 3 characters." };
-  if (content.length < 20) return { error: "Content is too short." };
-  if (cover_url && !/^(https:\/\/|\/uploads\/)/.test(cover_url))
-    return { error: "Cover image must be an https:// URL or an uploaded image." };
   const status = body.status === "draft" ? "draft" : "published";
-  return { title, excerpt, content, cover_url, status };
+  const title = clean(body.title, 160) || "Untitled post";
+  const excerpt = clean(body.excerpt, 300);
+  const content = String(body.content ?? "").trim().slice(0, 200_000);
+  const cover_url = clean(body.cover_url, 500);
+  // Drafts can be half-written; only a published post has to be complete
+  if (status === "published") {
+    if (title.length < 3 || title === "Untitled post") return { error: "Give the post a title before publishing." };
+    if (content.length < 20) return { error: "Content is too short." };
+  }
+  if (cover_url && !validImage(cover_url))
+    return { error: "Cover image must be an https:// URL or an uploaded image." };
+  return {
+    title, excerpt, content, cover_url, status,
+    blocks: (Array.isArray(body.blocks) ? body.blocks : []).slice(0, 400).map(cleanBlock).filter(Boolean),
+    faqs: (Array.isArray(body.faqs) ? body.faqs : []).slice(0, 30)
+      .map(f => ({ q: clean(f?.q, 300), a: text(f?.a, 3000) })),
+    meta_title: clean(body.meta_title, 200),
+    meta_description: clean(body.meta_description, 400),
+    keyword: clean(body.keyword, 120),
+    tags: (Array.isArray(body.tags) ? body.tags : []).slice(0, 15).map(t => clean(t, 50)).filter(Boolean),
+    category: clean(body.category, 80),
+    featured: !!body.featured,
+    author: clean(body.author, 100) || "Mount Quintaa Team"
+  };
+}
+
+/* Make a slug unique, ignoring the post being edited */
+async function uniqueSlug(wanted, ownId) {
+  let slug = wanted, i = 1;
+  for (;;) {
+    const { data } = check(await supabase.from(BLOGS).select("id").eq("slug", slug).maybeSingle());
+    if (!data || data.id === ownId) return slug;
+    slug = `${wanted}-${++i}`;
+  }
 }
 
 app.post("/api/admin/blogs", requireAuth, safe(async (req, res) => {
   const v = validBlog(req.body);
   if (v.error) return res.status(400).json({ error: v.error });
-  let slug = slugify(v.title) || "post";
-  // guarantee unique slug
-  let i = 1, base = slug;
-  for (;;) {
-    const { data } = check(await supabase.from(BLOGS).select("id").eq("slug", slug).maybeSingle());
-    if (!data) break;
-    slug = `${base}-${++i}`;
-  }
-  check(await supabase.from(BLOGS).insert({ ...v, slug }));
-  res.status(201).json({ ok: true, slug });
+  const named = v.title !== "Untitled post";
+  const wanted = slugify(clean(req.body.slug, 160)) || (named && slugify(v.title)) || "draft-" + crypto.randomBytes(4).toString("hex");
+  const slug = await uniqueSlug(wanted);
+  const published_at = v.status === "published" ? new Date().toISOString() : null;
+  const { data } = check(await supabase.from(BLOGS).insert({ ...v, slug, published_at }).select("id, slug").single());
+  res.status(201).json({ ok: true, id: data.id, slug: data.slug });
 }));
 
 /* Admin: full list including drafts, with content stats */
 app.get("/api/admin/blogs", requireAuth, safe(async (req, res) => {
   const { data } = check(
     await supabase.from(BLOGS)
-      .select("id, title, slug, excerpt, cover_url, status, created_at, updated_at, content")
-      .order("created_at", { ascending: false })
+      .select("id, title, slug, excerpt, cover_url, status, created_at, updated_at, published_at, category, featured, content")
   );
-  const blogs = data.map(({ content, ...b }) => ({ ...b, content_len: (content || "").length }));
+  const blogs = data
+    .map(({ content, ...b }) => ({ ...b, content_len: (content || "").length }))
+    .sort((a, b) => postDate(b) - postDate(a));
   res.json({ blogs });
 }));
 
@@ -280,13 +347,18 @@ app.put("/api/admin/blogs/:id", requireAuth, safe(async (req, res) => {
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
   const v = validBlog(req.body);
   if (v.error) return res.status(400).json({ error: v.error });
-  const { count } = check(
-    await supabase.from(BLOGS)
-      .update({ ...v, updated_at: new Date().toISOString() }, { count: "exact" })
-      .eq("id", id)
+  const { data: current } = check(
+    await supabase.from(BLOGS).select("id, slug, status, created_at, published_at").eq("id", id).maybeSingle()
   );
-  if (!count) return res.status(404).json({ error: "Post not found" });
-  res.json({ ok: true });
+  if (!current) return res.status(404).json({ error: "Post not found" });
+  const wanted = slugify(clean(req.body.slug, 160));
+  const slug = wanted && wanted !== current.slug ? await uniqueSlug(wanted, id) : current.slug;
+  const now = new Date().toISOString();
+  // Older posts have no published_at, so they keep the date they went live
+  const live = current.published_at || (current.status === "published" ? current.created_at : null);
+  const published_at = v.status === "published" ? live || now : live;
+  check(await supabase.from(BLOGS).update({ ...v, slug, published_at, updated_at: now }).eq("id", id));
+  res.json({ ok: true, id, slug });
 }));
 
 app.delete("/api/admin/blogs/:id", requireAuth, safe(async (req, res) => {
